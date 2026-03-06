@@ -1,0 +1,27 @@
+.fab {
+  position: fixed;
+  bottom: calc(24px + env(safe-area-inset-bottom));
+  right: 20px;
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-full);
+  background: var(--accent);
+  color: var(--ghost-white);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--shadow-accent);
+  z-index: 90;
+  transition: transform 100ms ease, box-shadow 100ms ease;
+}
+
+.fab:active {
+  transform: scale(0.93);
+  box-shadow: 0 2px 8px rgba(28, 28, 28, 0.2);
+}
+
+@media (min-width: 768px) {
+  .fab {
+    display: none;
+  }
+}
