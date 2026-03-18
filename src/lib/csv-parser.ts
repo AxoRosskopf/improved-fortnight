@@ -90,7 +90,7 @@ const CASE_B_CONFIG: FormatConfig = {
     },
     {
       csvColumn: 'Categoría', // Asigna la categoría si viene en el CSV
-      apply: (raw, p) => { if (raw.trim()) p.category = raw.trim() as any; }
+      apply: (raw, p) => { if (raw.trim()) p.category = raw.trim(); }
     },
     {
       csvColumn: 'UOM',
@@ -108,12 +108,12 @@ const CASE_B_CONFIG: FormatConfig = {
       csvColumn: 'Punto de reorden',
       apply: (raw, p) => {
         const val = parseFloat(raw.replace(/,/g, ''));
-        if (!isNaN(val)) (p as any).reorderPoint = val; 
+        if (!isNaN(val)) p.reorderPoint = val;
       },
     },
     {
       csvColumn: 'Notas',
-      apply: (raw, p) => { (p as any).notes = raw.trim() || undefined; },
+      apply: (raw, p) => { p.notes = raw.trim() || undefined; },
     },
     {
       csvColumn: 'Foto',
@@ -164,14 +164,14 @@ export function exportToCsv(products: InventoryItem[]): string {
     'Aplicaciones/Especificación': p.description ?? '',
     'UOM': p.unit ?? '',
     'Stock': p.stock,
-    'Punto de reorden': (p as any).reorderPoint ?? '',
-    'Notas': (p as any).notes ?? '',
+    'Punto de reorden': p.reorderPoint ?? '',
+    'Notas': p.notes ?? '',
     'Foto': p.imageUrl ?? '',
     'Ficha técnica': p.techSheetUrl ?? '',
     'Precio compra': p.purchasePrice ?? '',
     'Precio venta': p.salePrice ?? '',
     'Link video': p.videoUrl ?? '',
-    'QR Code': (p as any).qrCode ?? '',
+    'QR Code': p.qrCode ?? '',
   }));
   return Papa.unparse(rows, { columns: EXPORT_COLUMNS as unknown as string[] });
 }
