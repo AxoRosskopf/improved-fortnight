@@ -43,12 +43,17 @@
   color: #fff;
 }
 
-/* ── Backdrop ─────────────────────────────────────────────────────────────── */
+/* ── Search + filter wrapper ──────────────────────────────────────────────── */
+.searchWrapper {
+  position: relative;
+}
+
+/* ── Backdrop (transparent — click-away only, no dark tint) ──────────────── */
 .overlay {
   position: fixed;
   inset: 0;
   z-index: 100;
-  background: rgba(0, 0, 0, 0.45);
+  background: transparent;
 }
 
 /* ── Sheet (mobile: bottom drawer) ────────────────────────────────────────── */
@@ -66,17 +71,17 @@
   gap: 20px;
 }
 
-/* ── Sheet (desktop: anchored dropdown) ────────────────────────────────────── */
+/* ── Sheet (desktop: anchored dropdown below filter button) ─────────────────── */
 @media (min-width: 768px) {
   .sheet {
     position: absolute;
-    top: calc(100% - 8px); /* align below SearchBar area */
-    right: 16px;
+    top: 100%;
+    right: 0;
     bottom: auto;
     left: auto;
     width: 272px;
     border-radius: var(--radius-lg);
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
     padding: 16px;
   }
 }

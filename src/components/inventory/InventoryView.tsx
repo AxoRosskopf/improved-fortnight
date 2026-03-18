@@ -1,24 +1,15 @@
 'use client';
 
-import { useState, useCallback, useMemo, useRef } from 'react';
-import {
-  useReactTable,
-  getCoreRowModel,
-  getFilteredRowModel,
-  getSortedRowModel,
-  createColumnHelper,
-  type ColumnFiltersState,
-  type SortingState,
-  type FilterFn,
-  type Row,
-} from '@tanstack/react-table';
-import { X, ArrowUp, ArrowDown, ScanLine, Upload, Download, Plus } from 'lucide-react';
+import { useState, useRef } from 'react';
+import { Upload, Download, Plus, ScanLine } from 'lucide-react';
 import { useInventory } from '@/hooks/useInventory';
 import { useToast } from '@/hooks/useToast';
+import { useInventoryFilter } from '@/hooks/useInventoryFilter';
 import { exportToCsv } from '@/lib/csv-parser';
 import { useCsvImport } from '@/hooks/useCsvImport';
 import type { InventoryItem } from '@/lib/types';
-import SearchBar from '@/components/dashboard/SearchBar';
+import SearchBar from './SearchBar';
+import FilterSortSheet from './FilterSortSheet';
 import InventoryList from './InventoryList';
 import ProductFormModal from './ProductFormModal';
 import ProductDetailModal from './ProductDetailModal';
@@ -27,101 +18,36 @@ import CsvPreviewModal from './CsvPreviewModal';
 import ScanFab from '@/components/ui/ScanFab';
 import styles from './InventoryView.module.css';
 
-// ---------------------------------------------------------------------------
-// Column helper & filter functions
-// ---------------------------------------------------------------------------
-
-const columnHelper = createColumnHelper<InventoryItem>();
-
-const globalFilterFn: FilterFn<InventoryItem> = (row: Row<InventoryItem>, _: string, filterValue: string) => {
-  const s = filterValue.toLowerCase();
-  return (
-    row.original.name?.toLowerCase().includes(s) ||
-    row.original.description?.toLowerCase().includes(s) ||
-    row.original.qrCode?.toLowerCase().includes(s)
-  );
-};
-globalFilterFn.autoRemove = (val: unknown) => !val;
-
-const categoryFilterFn: FilterFn<InventoryItem> = (row: Row<InventoryItem>, columnId: string, filterValue: string[]) => {
-  if (!filterValue.length) return true;
-  return filterValue.includes(row.getValue(columnId));
-};
-categoryFilterFn.autoRemove = (val: unknown) => !Array.isArray(val) || val.length === 0;
-
-const columns = [
-  columnHelper.accessor('name', { enableGlobalFilter: true, enableSorting: false }),
-  columnHelper.accessor('description', { enableGlobalFilter: true, enableSorting: false }),
-  columnHelper.accessor('qrCode', { enableGlobalFilter: true, enableSorting: false }),
-  columnHelper.accessor('category', { enableGlobalFilter: false, filterFn: categoryFilterFn, enableSorting: false }),
-  columnHelper.accessor('stock', { enableGlobalFilter: false, enableColumnFilter: false }),
-];
-
-// ---------------------------------------------------------------------------
-// InventoryView
-// ---------------------------------------------------------------------------
-
 type FormTarget = InventoryItem | 'new' | null;
 
-export default function InventoryView() {
-  const { products, addProduct, updateProduct, replaceAll } = useInventory();
+interface InventoryViewProps {
+  // Controlled mode: items come from outside (e.g. Google Sheet).
+  // Mutations update local state only until a write-back API is wired up.
+  // Uncontrolled (default): uses useInventory() with localStorage.
+  initialItems?: InventoryItem[];
+}
+
+export default function InventoryView({ initialItems }: InventoryViewProps) {
+  const isControlled = initialItems !== undefined;
+
+  // Always call hooks unconditionally (React rules).
+  const localInventory = useInventory();
   const { toast } = useToast();
   const csvImport = useCsvImport();
 
-  // Table state
-  const [globalFilter, setGlobalFilter] = useState('');
-  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
-  const [sorting, setSorting] = useState<SortingState>([]);
-  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  // Controlled mode keeps a local copy; uncontrolled delegates to the hook.
+  const [localItems, setLocalItems] = useState<InventoryItem[]>(initialItems ?? []);
+  const products = isControlled ? localItems : localInventory.products;
 
-  // Modal state
+  const { search, setSearch, selectedCategories, toggleCategory, stockSort, toggleStockSort, filterActive, categories, filtered } =
+    useInventoryFilter(products);
+
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [formTarget, setFormTarget] = useState<FormTarget>(null);
   const [detailTarget, setDetailTarget] = useState<InventoryItem | null>(null);
   const [scannerOpen, setScannerOpen] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const table = useReactTable({
-    data: products,
-    columns,
-    state: { globalFilter, columnFilters, sorting },
-    onGlobalFilterChange: setGlobalFilter,
-    onColumnFiltersChange: setColumnFilters,
-    onSortingChange: setSorting,
-    globalFilterFn,
-    getCoreRowModel: getCoreRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-  });
-
-  const filteredItems = table.getRowModel().rows.map((r) => r.original);
-
-  const categories = useMemo(
-    () => [...new Set(products.map((p) => p.category))].sort(),
-    [products],
-  );
-
-  const selectedCategories = (columnFilters.find((f) => f.id === 'category')?.value as string[]) ?? [];
-  const stockSort = sorting.find((s) => s.id === 'stock');
-  const filterActive = selectedCategories.length > 0 || !!stockSort;
-
-  const toggleCategory = useCallback((cat: string) => {
-    setColumnFilters((prev) => {
-      const current = (prev.find((f) => f.id === 'category')?.value as string[]) ?? [];
-      const next = current.includes(cat) ? current.filter((c) => c !== cat) : [...current, cat];
-      const others = prev.filter((f) => f.id !== 'category');
-      return next.length ? [...others, { id: 'category', value: next }] : others;
-    });
-  }, []);
-
-  const toggleStockSort = useCallback(() => {
-    setSorting((prev) => {
-      const current = prev.find((s) => s.id === 'stock');
-      if (!current) return [{ id: 'stock', desc: false }];
-      if (!current.desc) return [{ id: 'stock', desc: true }];
-      return [];
-    });
-  }, []);
 
   function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -132,8 +58,12 @@ export default function InventoryView() {
 
   function handleCsvConfirm() {
     const items = csvImport.confirm();
-    replaceAll(items);
-    toast(`${items.length} productos importados`, 'success');
+    if (isControlled) {
+      setLocalItems(items);
+    } else {
+      localInventory.replaceAll(items);
+      toast(`${items.length} productos importados`, 'success');
+    }
   }
 
   function handleCsvExport() {
@@ -148,12 +78,20 @@ export default function InventoryView() {
   }
 
   function handleSave(item: InventoryItem) {
-    if (formTarget === 'new') {
-      addProduct(item);
-    } else if (formTarget) {
-      updateProduct(item.id, item);
-      // sync detailTarget if it was open
-      if (detailTarget?.id === item.id) setDetailTarget(item);
+    if (isControlled) {
+      if (formTarget === 'new') {
+        setLocalItems((prev) => [...prev, item]);
+      } else {
+        setLocalItems((prev) => prev.map((i) => (i.id === item.id ? item : i)));
+        if (detailTarget?.id === item.id) setDetailTarget(item);
+      }
+    } else {
+      if (formTarget === 'new') {
+        localInventory.addProduct(item);
+      } else if (formTarget) {
+        localInventory.updateProduct(item.id, item);
+        if (detailTarget?.id === item.id) setDetailTarget(item);
+      }
     }
     setFormTarget(null);
   }
@@ -169,13 +107,7 @@ export default function InventoryView() {
         <label className={styles.toolbarBtn}>
           <Upload size={15} />
           <span>Importar</span>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".csv"
-            hidden
-            onChange={handleFileSelect}
-          />
+          <input ref={fileInputRef} type="file" accept=".csv" hidden onChange={handleFileSelect} />
         </label>
         <button className={styles.toolbarBtn} onClick={handleCsvExport}>
           <Download size={15} />
@@ -188,15 +120,29 @@ export default function InventoryView() {
       </div>
 
       {/* Search + filter */}
-      <SearchBar
-        value={globalFilter}
-        onChange={setGlobalFilter}
-        onFilterClick={() => setIsFilterOpen(true)}
-        filterActive={filterActive}
-      />
+      <div className={styles.searchWrapper}>
+        <SearchBar
+          value={search}
+          onChange={setSearch}
+          onFilterClick={() => setIsFilterOpen(true)}
+          filterActive={filterActive}
+        />
+
+        {/* Filter / sort sheet — rendered here so it positions relative to the search bar */}
+        {isFilterOpen && (
+          <FilterSortSheet
+            categories={categories}
+            selectedCategories={selectedCategories}
+            stockSort={stockSort}
+            onToggleCategory={toggleCategory}
+            onToggleStockSort={toggleStockSort}
+            onClose={() => setIsFilterOpen(false)}
+          />
+        )}
+      </div>
 
       {/* List / Empty state */}
-      {products.length === 0 ? (
+      {products.length === 0 && !isControlled ? (
         <div className={styles.emptyState}>
           <p className={styles.emptyTitle}>No hay productos</p>
           <p className={styles.emptySubtitle}>Añade uno manualmente o importa un CSV.</p>
@@ -212,56 +158,12 @@ export default function InventoryView() {
             </label>
           </div>
         </div>
-      ) : filteredItems.length === 0 ? (
+      ) : filtered.length === 0 ? (
         <div className={styles.emptyState}>
           <p className={styles.emptySubtitle}>No se encontraron productos con ese filtro.</p>
         </div>
       ) : (
-        <InventoryList items={filteredItems} onItemClick={(item) => setDetailTarget(item)} />
-      )}
-
-      {/* Filter / sort overlay */}
-      {isFilterOpen && (
-        <>
-          <div className={styles.overlay} aria-hidden="true" onClick={() => setIsFilterOpen(false)} />
-          <div className={styles.sheet} role="dialog" aria-label="Filtrar y ordenar">
-            <div className={styles.sheetHeader}>
-              <span className={styles.sheetTitle}>Filtrar y ordenar</span>
-              <button className={styles.closeBtn} aria-label="Cerrar" onClick={() => setIsFilterOpen(false)}>
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className={styles.section}>
-              <p className={styles.sectionLabel}>Categoría</p>
-              <div className={styles.chips}>
-                {categories.map((cat) => (
-                  <button
-                    key={cat}
-                    className={styles.chip}
-                    data-selected={selectedCategories.includes(cat)}
-                    onClick={() => toggleCategory(cat)}
-                  >
-                    {cat}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className={styles.section}>
-              <p className={styles.sectionLabel}>Ordenar por Stock</p>
-              <button className={styles.sortRow} onClick={toggleStockSort}>
-                <span>
-                  {!stockSort && 'Orden predeterminado'}
-                  {stockSort && !stockSort.desc && 'Menor → Mayor'}
-                  {stockSort?.desc && 'Mayor → Menor'}
-                </span>
-                {stockSort && !stockSort.desc && <ArrowUp size={16} />}
-                {stockSort?.desc && <ArrowDown size={16} />}
-              </button>
-            </div>
-          </div>
-        </>
+        <InventoryList items={filtered} onItemClick={(item) => setDetailTarget(item)} />
       )}
 
       {/* Modals */}
