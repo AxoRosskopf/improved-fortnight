@@ -18,13 +18,8 @@ import type { Metadata } from 'next';
 // ---------------------------------------------------------------------------
 
 // In Next.js 15, `params` is a Promise — must be awaited before use.
-export async function generateMetadata({
-  params,
-}: {
-  params: Promise<{ sheetId: string }>;
-}): Promise<Metadata> {
-  const { sheetId } = await params;
-  return { title: `Inventario — ${sheetId}` };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: `Inventario` };
 }
 
 // ---------------------------------------------------------------------------
@@ -51,5 +46,5 @@ export default async function Page({
     );
   }
 
-  return <SheetRenderer sheets={nonEmpty} />;
+  return <SheetRenderer sheets={nonEmpty} sheetId={sheetId} />;
 }

@@ -12,6 +12,7 @@ interface ProductFormModalProps {
   existingCategories: string[];
   onSave: (item: InventoryItem) => void;
   onClose: () => void;
+  saving?: boolean;
 }
 
 const NEW_CAT_SENTINEL = '__new__';
@@ -21,12 +22,14 @@ export default function ProductFormModal({
   existingCategories,
   onSave,
   onClose,
+  saving = false,
 }: ProductFormModalProps) {
   const isEdit = !!initialData;
 
   const [category, setCategory] = useState(initialData?.category ?? existingCategories[0] ?? '');
   const [newCategory, setNewCategory] = useState('');
   const [showNewCat, setShowNewCat] = useState(false);
+  const [subcategory, setSubcategory] = useState(initialData?.subcategory ?? '');
   const [name, setName] = useState(initialData?.name ?? '');
   const [description, setDescription] = useState(initialData?.description ?? '');
   const [unit, setUnit] = useState(initialData?.unit ?? '');
@@ -60,6 +63,7 @@ export default function ProductFormModal({
       id: initialData?.id ?? crypto.randomUUID(),
       qrCode: initialData?.qrCode ?? crypto.randomUUID(),
       category: resolvedCategory,
+      subcategory: subcategory.trim() || undefined,
 
       name: name.trim(),
       description: description.trim(),
@@ -72,6 +76,8 @@ export default function ProductFormModal({
       notes: notes.trim() || undefined,
       techSheetUrl: techSheetUrl.trim() || undefined,
       videoUrl: videoUrl.trim() || undefined,
+      // Preserve sheet metadata so InventoryView knows which row to update
+      _sheetMeta: initialData?._sheetMeta,
     };
 
     const validationErrors = validateProduct(item);
@@ -118,6 +124,12 @@ export default function ProductFormModal({
               />
             )}
             {fieldError('category') && <span className={styles.errorText}>{fieldError('category')}</span>}
+          </div>
+
+          {/* Subcategory */}
+          <div className={styles.field}>
+            <label className={styles.label}>Subcategoría</label>
+            <input className={styles.input} value={subcategory} onChange={(e) => setSubcategory(e.target.value)} />
           </div>
 
           {/* Name */}
@@ -211,9 +223,9 @@ export default function ProductFormModal({
         </div>
 
         <div className={styles.actions}>
-          <button className={styles.cancelBtn} onClick={onClose}>Cancelar</button>
-          <button className={styles.saveBtn} onClick={handleSave}>
-            {isEdit ? 'Guardar cambios' : 'Agregar producto'}
+          <button className={styles.cancelBtn} onClick={onClose} disabled={saving}>Cancelar</button>
+          <button className={styles.saveBtn} onClick={handleSave} disabled={saving}>
+            {saving ? 'Guardando…' : (isEdit ? 'Guardar cambios' : 'Agregar producto')}
           </button>
         </div>
       </div>

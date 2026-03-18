@@ -20,6 +20,7 @@ const statusLabel: Record<StockStatus, string> = {
 interface ProductDetailModalProps {
   product: InventoryItem;
   onEdit: () => void;
+  onDelete?: () => void;
   onClose: () => void;
 }
 
@@ -45,7 +46,7 @@ function FieldRow({ label, value, isLink }: FieldRowProps) {
   );
 }
 
-export default function ProductDetailModal({ product, onEdit, onClose }: ProductDetailModalProps) {
+export default function ProductDetailModal({ product, onEdit, onDelete, onClose }: ProductDetailModalProps) {
   const status = deriveStatus(product);
   const categoryLabel = product.category;
 
@@ -86,6 +87,18 @@ export default function ProductDetailModal({ product, onEdit, onClose }: Product
         </div>
 
         <div className={styles.actions}>
+          {onDelete && (
+            <button
+              className={styles.deleteBtn}
+              onClick={() => {
+                if (window.confirm(`¿Eliminar "${product.name}"? Esta acción no se puede deshacer.`)) {
+                  onDelete();
+                }
+              }}
+            >
+              Eliminar
+            </button>
+          )}
           <button className={styles.editBtn} onClick={onEdit}>
             Editar
           </button>

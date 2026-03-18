@@ -21,13 +21,13 @@ import styles from './InventoryView.module.css';
 type FormTarget = InventoryItem | 'new' | null;
 
 interface InventoryViewProps {
-  // Controlled mode: items come from outside (e.g. Google Sheet).
-  // Mutations update local state only until a write-back API is wired up.
-  // Uncontrolled (default): uses useInventory() with localStorage.
+  /** Items loaded from Google Sheets. When provided, mutations sync back to the sheet. */
   initialItems?: InventoryItem[];
+  /** Google Spreadsheet ID — required to write back to the sheet. */
+  sheetId?: string;
 }
 
-export default function InventoryView({ initialItems }: InventoryViewProps) {
+export default function InventoryView({ initialItems, sheetId }: InventoryViewProps) {
   const isControlled = initialItems !== undefined;
 
   // Always call hooks unconditionally (React rules).
@@ -37,6 +37,7 @@ export default function InventoryView({ initialItems }: InventoryViewProps) {
 
   // Controlled mode keeps a local copy; uncontrolled delegates to the hook.
   const [localItems, setLocalItems] = useState<InventoryItem[]>(initialItems ?? []);
+  const [isSaving, setIsSaving] = useState(false);
   const products = isControlled ? localItems : localInventory.products;
 
   const { search, setSearch, selectedCategories, toggleCategory, stockSort, toggleStockSort, filterActive, categories, filtered } =
@@ -77,23 +78,120 @@ export default function InventoryView({ initialItems }: InventoryViewProps) {
     URL.revokeObjectURL(url);
   }
 
-  function handleSave(item: InventoryItem) {
-    if (isControlled) {
-      if (formTarget === 'new') {
-        setLocalItems((prev) => [...prev, item]);
-      } else {
-        setLocalItems((prev) => prev.map((i) => (i.id === item.id ? item : i)));
-        if (detailTarget?.id === item.id) setDetailTarget(item);
-      }
-    } else {
+  async function handleSave(item: InventoryItem) {
+    if (!isControlled) {
+      // Uncontrolled: persist to localStorage only
       if (formTarget === 'new') {
         localInventory.addProduct(item);
       } else if (formTarget) {
         localInventory.updateProduct(item.id, item);
         if (detailTarget?.id === item.id) setDetailTarget(item);
       }
+      setFormTarget(null);
+      return;
     }
-    setFormTarget(null);
+
+    if (!sheetId) {
+      // Controlled but no sheetId: update local state only
+      if (formTarget === 'new') {
+        setLocalItems((prev) => [...prev, item]);
+      } else {
+        setLocalItems((prev) => prev.map((i) => (i.id === item.id ? item : i)));
+        if (detailTarget?.id === item.id) setDetailTarget(item);
+      }
+      setFormTarget(null);
+      return;
+    }
+
+    // Controlled + sheetId: sync to Google Sheets
+    setIsSaving(true);
+    try {
+      if (formTarget === 'new') {
+        // Find a sibling item with the same category to determine which sheet tab to use
+        const sibling = localItems.find(
+          (i) => i.category === item.category && i._sheetMeta,
+        );
+        if (!sibling?._sheetMeta) {
+          toast(`No se encontró un producto con categoría "${item.category}" para determinar la hoja. Elige una categoría existente.`, 'error');
+          return;
+        }
+        const { sheetName, format } = sibling._sheetMeta;
+
+        const res = await fetch('/api/items', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ spreadsheetId: sheetId, sheetName, item, format }),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error ?? `Error ${res.status}`);
+        }
+        const { rowIndex } = await res.json();
+        setLocalItems((prev) => [
+          ...prev,
+          { ...item, _sheetMeta: { sheetName, rowIndex, format } },
+        ]);
+      } else {
+        // Editing: item._sheetMeta was preserved by ProductFormModal
+        const meta = item._sheetMeta;
+        if (!meta) {
+          toast('Este producto no tiene datos de hoja. No se puede actualizar.', 'error');
+          return;
+        }
+        const res = await fetch('/api/items', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            spreadsheetId: sheetId,
+            sheetName: meta.sheetName,
+            rowIndex: meta.rowIndex,
+            item,
+            format: meta.format,
+          }),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error ?? `Error ${res.status}`);
+        }
+        setLocalItems((prev) => prev.map((i) => (i.id === item.id ? item : i)));
+        if (detailTarget?.id === item.id) setDetailTarget(item);
+      }
+      setFormTarget(null);
+    } catch (err) {
+      toast((err as Error).message, 'error');
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function handleDelete(item: InventoryItem) {
+    if (!isControlled || !sheetId || !item._sheetMeta) {
+      // Uncontrolled or no sheet connection: delete from local state only
+      if (!isControlled) localInventory.deleteProduct(item.id);
+      else setLocalItems((prev) => prev.filter((i) => i.id !== item.id));
+      setDetailTarget(null);
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const { sheetName, rowIndex } = item._sheetMeta;
+      const res = await fetch('/api/items', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ spreadsheetId: sheetId, sheetName, rowIndex }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error ?? `Error ${res.status}`);
+      }
+      setLocalItems((prev) => prev.filter((i) => i.id !== item.id));
+      setDetailTarget(null);
+    } catch (err) {
+      toast((err as Error).message, 'error');
+    } finally {
+      setIsSaving(false);
+    }
   }
 
   return (
@@ -173,6 +271,7 @@ export default function InventoryView({ initialItems }: InventoryViewProps) {
           existingCategories={categories.length ? categories : ['Automotriz', 'Tapicería', 'Electrónica']}
           onSave={handleSave}
           onClose={() => setFormTarget(null)}
+          saving={isSaving}
         />
       )}
 
@@ -183,6 +282,7 @@ export default function InventoryView({ initialItems }: InventoryViewProps) {
             setFormTarget(detailTarget);
             setDetailTarget(null);
           }}
+          onDelete={isControlled ? () => handleDelete(detailTarget) : undefined}
           onClose={() => setDetailTarget(null)}
         />
       )}

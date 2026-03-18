@@ -50,7 +50,7 @@ export function useCsvImport(): CsvImportState {
           const detectedFormat = detectFormat(headers);
           setFormat(detectedFormat);
 
-          const { products, errors: parseErrors } = parseRows(results.data, category);
+          const { products, errors: parseErrors } = parseRows(results.data, { category });
           setPreview(products);
           setErrors(parseErrors);
           setIsLoading(false);

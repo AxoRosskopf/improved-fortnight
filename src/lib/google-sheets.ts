@@ -144,19 +144,27 @@ export async function fetchSheetData(sheetId: string): Promise<SheetData[]> {
 
     if (headerRowIdx === -1) continue; // no recognized header row in this sheet
 
-    const rows: Record<string, string>[] = rowData
+    // Track absolute 1-based row numbers before filtering empty rows
+    const rowsWithIndex = rowData
       .slice(headerRowIdx + 1)
-      .filter((row) => (row.values ?? []).some((c) => cellValue(c).trim() !== ''))
-      .map((row) => {
-        const values = row.values ?? [];
-        const record: Record<string, string> = {};
-        headers.forEach((header, i) => {
-          if (header) record[header] = cellValue(values[i]);
-        });
-        return record;
-      });
+      .map((row, localIdx) => ({
+        row,
+        sheetRowIndex: headerRowIdx + 2 + localIdx, // 1-based sheet row number
+      }))
+      .filter(({ row }) => (row.values ?? []).some((c) => cellValue(c).trim() !== ''));
 
-    const { products, errors } = parseRows(rows);
+    const rows: Record<string, string>[] = rowsWithIndex.map(({ row }) => {
+      const values = row.values ?? [];
+      const record: Record<string, string> = {};
+      headers.forEach((header, i) => {
+        if (header) record[header] = cellValue(values[i]);
+      });
+      return record;
+    });
+
+    const rowIndices = rowsWithIndex.map(({ sheetRowIndex }) => sheetRowIndex);
+
+    const { products, errors } = parseRows(rows, { rowIndices, sheetName });
 
     if (errors.length > 0) {
       console.warn(`[google-sheets] "${sheetName}" row errors:`, errors);

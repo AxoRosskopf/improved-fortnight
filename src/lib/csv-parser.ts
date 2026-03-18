@@ -89,6 +89,10 @@ const CASE_B_CONFIG: FormatConfig = {
       apply: (raw, p) => { p.name = raw.trim(); },
     },
     {
+      csvColumn: 'Subcategoría',
+      apply: (raw, p) => { p.subcategory = raw.trim() || undefined; },
+    },
+    {
       csvColumn: 'Categoría', // Asigna la categoría si viene en el CSV
       apply: (raw, p) => { if (raw.trim()) p.category = raw.trim(); }
     },
@@ -178,8 +182,21 @@ export function exportToCsv(products: InventoryItem[]): string {
 
 export function parseRows(
   rows: Record<string, string>[],
-  category?: 'Automotriz' | 'Tapicería',
+  options?: {
+    category?: 'Automotriz' | 'Tapicería';
+    /** Absolute 1-based sheet row numbers, parallel to `rows`. When present,
+     *  each successfully parsed product gets its row index stored in _sheetMeta. */
+    rowIndices?: number[];
+    sheetName?: string;
+  },
 ): ParseResult {
+  // Legacy positional call: parseRows(rows, 'Automotriz')
+  const category = typeof options === 'string'
+    ? (options as unknown as 'Automotriz' | 'Tapicería')
+    : options?.category;
+  const rowIndices = typeof options === 'object' ? options?.rowIndices : undefined;
+  const sheetName  = typeof options === 'object' ? options?.sheetName  : undefined;
+
   if (rows.length === 0) return { products: [], errors: [] };
 
   const headers = Object.keys(rows[0]);
@@ -193,13 +210,13 @@ export function parseRows(
   }
 
   const config = CONFIGS.find((c) => c.detectKey === (format === 'case-a' ? 'Nombre' : 'Producto'))!;
-  
+
   const products: InventoryItem[] = [];
   const errors: Array<{ row: number; message: string }> = [];
 
   rows.forEach((row, idx) => {
-    const rowNumber = idx + 2; 
-    
+    const rowNumber = idx + 2;
+
     // Asignación de categoría base
     const product: Partial<InventoryItem> = {
       id: crypto.randomUUID(),
@@ -215,6 +232,15 @@ export function parseRows(
     if (!product.name) {
       errors.push({ row: rowNumber, message: `Fila ${rowNumber}: el campo "nombre" o "producto" está vacío.` });
       return;
+    }
+
+    // Attach sheet metadata when reading from Google Sheets
+    if (rowIndices && sheetName) {
+      product._sheetMeta = {
+        sheetName,
+        rowIndex: rowIndices[idx],
+        format,
+      };
     }
 
     products.push(product as InventoryItem);
