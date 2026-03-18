@@ -32,6 +32,7 @@ export default function InventoryCard({ item, onClick }: { item: InventoryItem; 
         width={64}
         height={64}
         className={styles.image}
+        unoptimized={!!item.imageUrl}
       />
 
       <div className={styles.info}>
