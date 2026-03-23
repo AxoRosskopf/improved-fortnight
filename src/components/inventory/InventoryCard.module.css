@@ -54,6 +54,12 @@
   margin-top: 2px;
 }
 
+.location {
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
 .right {
   display: flex;
   flex-direction: column;

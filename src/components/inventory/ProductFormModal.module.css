@@ -161,3 +161,203 @@
 .cancelBtn:hover {
   background: var(--bg-primary);
 }
+
+/* -------------------------------------------------------------------------
+ * Image upload widget
+ * ---------------------------------------------------------------------- */
+
+.hiddenInput {
+  display: none;
+}
+
+.uploadZone {
+  border: 2px dashed var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 24px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: border-color 150ms ease, background-color 150ms ease;
+  text-align: center;
+}
+
+.uploadZone:hover {
+  border-color: var(--accent);
+  background: var(--bg-elevated);
+}
+
+.uploadZoneDragging {
+  border-color: var(--accent);
+  background: var(--bg-elevated);
+}
+
+.uploadZoneUploading {
+  opacity: 0.6;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.uploadZoneError {
+  border-color: var(--color-danger);
+}
+
+.locationRow {
+  display: flex;
+  gap: 10px;
+}
+
+.locationSelect {
+  flex: 1;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  font-family: inherit;
+  transition: border-color 150ms ease;
+}
+
+.locationSelect:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.locationSelect:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.uploadOptions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+
+.uploadOptionsRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+}
+
+.uploadOptionBtn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 18px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+
+.uploadOptionBtn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--bg-elevated);
+}
+
+.uploadOptionDivider {
+  width: 1px;
+  height: 40px;
+  background: var(--border);
+  flex-shrink: 0;
+}
+
+.uploadZoneDone {
+  border-style: solid;
+  border-color: var(--border-subtle);
+  padding: 12px;
+  cursor: default;
+}
+
+.uploadZoneDone:hover {
+  background: unset;
+  border-color: var(--border-subtle);
+}
+
+.uploadHint {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.uploadPreview {
+  width: 100%;
+  max-height: 140px;
+  object-fit: contain;
+  border-radius: var(--radius-sm, 4px);
+}
+
+.uploadFileName {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  word-break: break-all;
+}
+
+.uploadSpinner {
+  width: 22px;
+  height: 22px;
+  border: 2px solid var(--border-subtle);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.uploadErrorMsg {
+  font-size: 0.75rem;
+  color: var(--color-danger);
+}
+
+.retryLink {
+  font-size: 0.75rem;
+  color: var(--accent);
+  text-decoration: underline;
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
+  font-family: inherit;
+}
+
+.existingImageBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.existingImage {
+  width: 100%;
+  max-height: 120px;
+  object-fit: contain;
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+}
+
+.replaceBtn {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-decoration: underline;
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
+  font-family: inherit;
+  align-self: flex-start;
+}
+
+.replaceBtn:hover {
+  color: var(--text-primary);
+}

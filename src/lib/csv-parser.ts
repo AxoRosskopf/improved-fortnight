@@ -78,6 +78,14 @@ const CASE_A_CONFIG: FormatConfig = {
       csvColumn: 'Ficha tecnica', // Corregido: Sin tilde según el CSV
       apply: (raw, p) => { p.techSheetUrl = sanitizeDriveUrl(raw) || undefined; },
     },
+    {
+      csvColumn: 'Estante',
+      apply: (raw, p) => { const n = parseInt(raw.trim(), 10); if (!isNaN(n)) p.shelf = n; },
+    },
+    {
+      csvColumn: 'Nivel',
+      apply: (raw, p) => { const n = parseInt(raw.trim(), 10); if (!isNaN(n)) p.level = n; },
+    },
   ],
 };
 
@@ -138,6 +146,14 @@ const CASE_B_CONFIG: FormatConfig = {
     {
       csvColumn: 'Precio de venta', // Agregado para Auto/Tapicería
       apply: (raw, p) => { p.salePrice = parsePrice(raw); },
+    },
+    {
+      csvColumn: 'Estante',
+      apply: (raw, p) => { const n = parseInt(raw.trim(), 10); if (!isNaN(n)) p.shelf = n; },
+    },
+    {
+      csvColumn: 'Nivel',
+      apply: (raw, p) => { const n = parseInt(raw.trim(), 10); if (!isNaN(n)) p.level = n; },
     },
   ],
 };

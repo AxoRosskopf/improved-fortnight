@@ -1,0 +1,337 @@
+.root {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+}
+
+/* ── Shelves row ─────────────────────────────────────────── */
+/* Mobile: estantes apilados verticalmente, sin scroll horizontal */
+.shelvesRow {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+}
+
+/* Desktop: estantes en fila horizontal */
+@media (min-width: 640px) {
+  .shelvesRow {
+    flex-direction: row;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 20px;
+  }
+}
+
+/* ── Single shelf ────────────────────────────────────────── */
+.shelf {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  width: 100%;
+}
+
+@media (min-width: 640px) {
+  .shelf {
+    flex: 1 1 0;
+    width: auto;
+    max-width: 340px;
+  }
+}
+
+.shelfLabel {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-muted);
+  padding: 0 0 6px 32px;
+  white-space: nowrap;
+}
+
+.shelfBody {
+  border: 2px solid rgba(28, 28, 28, 0.22);
+  border-bottom: none;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  overflow: hidden;
+  background: var(--bg-card);
+}
+
+/* Solid "plank" at the bottom of each shelf */
+.shelfBase {
+  height: 6px;
+  background: rgba(28, 28, 28, 0.22);
+  border-radius: 0 0 2px 2px;
+}
+
+/* ── Level row ───────────────────────────────────────────── */
+.level {
+  display: flex;
+  align-items: stretch;
+  border-bottom: 2px solid rgba(28, 28, 28, 0.15);
+}
+
+.level:last-child {
+  border-bottom: none;
+}
+
+.levelLabel {
+  flex: 0 0 28px;
+  font-size: 0.62rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  border-right: 1px solid rgba(28, 28, 28, 0.12);
+  background: var(--bg-card);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cellRow {
+  display: flex;
+  flex: 1;
+}
+
+/* ── Cell ────────────────────────────────────────────────── */
+.cell {
+  flex: 1 1 0;
+  height: 44px;
+  min-width: 0;
+  border: none;
+  cursor: pointer;
+  transition: filter 0.1s ease;
+  position: relative;
+}
+
+.cell:hover {
+  filter: brightness(0.84);
+  z-index: 1;
+}
+
+.cell:active {
+  filter: brightness(0.72);
+}
+
+/* Status colours */
+.cell_empty {
+  background: #d1fae5;
+}
+
+.cell_occupied {
+  background: #fee2e2;
+}
+
+.cell_low_stock {
+  background: #fef3c7;
+}
+
+/* Selected: strong accent outline */
+.cell_selected {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+  z-index: 2;
+  filter: brightness(0.82);
+}
+
+/* Highlighted: blue outline when search matches */
+.cell_highlighted {
+  outline: 2px solid #3b82f6;
+  outline-offset: -2px;
+  z-index: 2;
+}
+
+/* Item count badge inside cell */
+.cellBadge {
+  position: absolute;
+  top: 3px;
+  right: 4px;
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: rgba(0, 0, 0, 0.4);
+  line-height: 1;
+  pointer-events: none;
+}
+
+/* Low-stock warning dot inside cell */
+.cellLowStock {
+  position: absolute;
+  bottom: 4px;
+  left: 5px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #d97706;
+  pointer-events: none;
+}
+
+/* ── Legend ──────────────────────────────────────────────── */
+.legend {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.legendDot {
+  width: 11px;
+  height: 11px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.legendDot_empty {
+  background: #d1fae5;
+  border: 1px solid #6ee7b7;
+}
+
+.legendDot_occupied {
+  background: #fee2e2;
+  border: 1px solid #fca5a5;
+}
+
+.legendDot_low_stock {
+  background: #fef3c7;
+  border: 1px solid #fcd34d;
+}
+
+.legendLabel {
+  font-size: 0.74rem;
+  color: var(--text-secondary);
+  margin-right: 10px;
+}
+
+/* Low-stock dot in legend */
+.legendLowStockDot {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: #d97706;
+  flex-shrink: 0;
+}
+
+/* ── Panel overlay ───────────────────────────────────────── */
+.panelOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: rgba(0, 0, 0, 0.32);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+@media (min-width: 640px) {
+  .panelOverlay {
+    align-items: center;
+  }
+}
+
+.panel {
+  background: var(--bg-card);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  width: 100%;
+  max-width: 400px;
+  max-height: 78vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: var(--shadow-elevated);
+}
+
+@media (min-width: 640px) {
+  .panel {
+    border-radius: var(--radius-lg);
+    max-height: 70vh;
+  }
+}
+
+/* ── Panel header ────────────────────────────────────────── */
+.panelHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 16px 16px 12px;
+  border-bottom: 1px solid var(--border-subtle);
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.panelCellId {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  display: block;
+}
+
+.panelAvailable {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  display: block;
+  margin-top: 3px;
+}
+
+.panelClose {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  transition: background 0.15s, color 0.15s;
+}
+
+.panelClose:hover {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+/* ── Panel content ───────────────────────────────────────── */
+.panelContent {
+  padding: 16px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.panelEmpty {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.itemsList {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.itemRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+  font-size: 0.8125rem;
+}
+
+.itemRowName {
+  flex: 1;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.itemRowStock {
+  font-size: 0.74rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}

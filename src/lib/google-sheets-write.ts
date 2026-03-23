@@ -59,6 +59,8 @@ function itemToRowCaseA(item: InventoryItem): string[] {
     item.salePrice != null ? String(item.salePrice) : '',
     item.imageUrl ?? '',
     item.techSheetUrl ?? '',
+    item.shelf != null ? String(item.shelf) : '',   // G: Estante
+    item.level != null ? String(item.level) : '',   // H: Nivel
   ];
 }
 
@@ -83,6 +85,8 @@ function itemToRowCaseB(item: InventoryItem): string[] {
     item.purchasePrice != null ? String(item.purchasePrice) : '',    // K: Precio de compra
     item.salePrice != null ? String(item.salePrice) : '',            // L: Precio de venta
     item.videoUrl ?? '',                                              // M: Link de video
+    item.shelf != null ? String(item.shelf) : '',                    // N: Estante
+    item.level != null ? String(item.level) : '',                    // O: Nivel
   ];
 }
 
@@ -90,12 +94,64 @@ function itemToRow(item: InventoryItem, format: CsvFormat): string[] {
   return format === 'case-a' ? itemToRowCaseA(item) : itemToRowCaseB(item);
 }
 
-/** Last column letter for each format (A=1, B=2, …, M=13) */
+/** Last column letter for each format (A=1, B=2, …) — includes Estante + Nivel */
 const LAST_COL: Record<CsvFormat, string> = {
-  'case-a': 'F',  // 6 columns
-  'case-b': 'M',  // 13 columns
+  'case-a': 'H',  // 8 columns (A–F original + G:Estante + H:Nivel)
+  'case-b': 'O',  // 15 columns (A–M original + N:Estante + O:Nivel)
   'unknown': 'Z',
 };
+
+/** Column letter for Estante and Nivel per format */
+const LOCATION_COLS: Record<'case-a' | 'case-b', { estante: string; nivel: string }> = {
+  'case-a': { estante: 'G', nivel: 'H' },
+  'case-b': { estante: 'N', nivel: 'O' },
+};
+
+/**
+ * Ensures "Estante" and "Nivel" headers exist in row 1 of the given sheet.
+ * If missing, writes them at their expected column positions.
+ * This is a no-op if the headers already exist.
+ */
+async function ensureLocationColumns(
+  spreadsheetId: string,
+  sheetName: string,
+  format: CsvFormat,
+  sheets: ReturnType<typeof google.sheets>,
+): Promise<void> {
+  if (format === 'unknown') return;
+
+  const { estante, nivel } = LOCATION_COLS[format];
+  const lastCol = LAST_COL[format];
+
+  let existing: string[] = [];
+  try {
+    const res = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: `'${sheetName}'!A1:${lastCol}1`,
+    });
+    existing = (res.data.values?.[0] ?? []) as string[];
+  } catch {
+    return;
+  }
+
+  if (!existing.includes('Estante')) {
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: `'${sheetName}'!${estante}1`,
+      valueInputOption: 'USER_ENTERED',
+      requestBody: { values: [['Estante']] },
+    });
+  }
+
+  if (!existing.includes('Nivel')) {
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: `'${sheetName}'!${nivel}1`,
+      valueInputOption: 'USER_ENTERED',
+      requestBody: { values: [['Nivel']] },
+    });
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -174,6 +230,8 @@ export async function appendRow(
   const auth = getAuthClient();
   const sheets = google.sheets({ version: 'v4', auth });
 
+  await ensureLocationColumns(spreadsheetId, sheetName, format, sheets);
+
   const values = [itemToRow(item, format)];
 
   const res = await sheets.spreadsheets.values.append({
@@ -202,6 +260,8 @@ export async function updateRow(
 ): Promise<void> {
   const auth = getAuthClient();
   const sheets = google.sheets({ version: 'v4', auth });
+
+  await ensureLocationColumns(spreadsheetId, sheetName, format, sheets);
 
   const lastCol = LAST_COL[format];
   const range = `'${sheetName}'!A${rowIndex}:${lastCol}${rowIndex}`;

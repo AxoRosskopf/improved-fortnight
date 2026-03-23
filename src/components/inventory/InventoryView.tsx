@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Plus, ScanLine, ClipboardList } from 'lucide-react';
+import { Plus, ScanLine, ClipboardList, LayoutList, Map } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useInventory } from '@/hooks/useInventory';
@@ -17,9 +17,11 @@ import ProductFormModal from './ProductFormModal';
 import ProductDetailModal from './ProductDetailModal';
 import QrScannerModal from './QrScannerModal';
 import ScanFab from '@/components/ui/ScanFab';
+import ShelfMapView from '@/components/shelving/ShelfMapView';
 import styles from './InventoryView.module.css';
 
 type FormTarget = InventoryItem | 'new' | null;
+type ViewMode = 'list' | 'map';
 
 interface InventoryViewProps {
   /** Items loaded from Google Sheets. When provided, mutations sync back to the sheet. */
@@ -59,6 +61,7 @@ export default function InventoryView({ initialItems, sheetId }: InventoryViewPr
   const { search, setSearch, selectedCategories, toggleCategory, stockSort, toggleStockSort, filterActive, categories, filtered } =
     useInventoryFilter(products);
 
+  const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [formTarget, setFormTarget] = useState<FormTarget>(null);
   const [detailTarget, setDetailTarget] = useState<InventoryItem | null>(null);
@@ -97,7 +100,18 @@ export default function InventoryView({ initialItems, sheetId }: InventoryViewPr
     }
   }
 
+  function deleteBlobImage(imageUrl: string) {
+    if (!imageUrl.includes('blob.vercel-storage.com')) return;
+    void fetch('/api/drive-upload', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: imageUrl }),
+    });
+  }
+
   async function handleDelete(item: InventoryItem) {
+    if (item.imageUrl) deleteBlobImage(item.imageUrl);
+
     if (!isControlled || !sheetId || !item._sheetMeta) {
       if (!isControlled) localInventory.deleteProduct(item.id);
       else setLocalItems((prev) => prev.filter((i) => i.id !== item.id));
@@ -124,6 +138,22 @@ export default function InventoryView({ initialItems, sheetId }: InventoryViewPr
             <span>Actividad</span>
           </Link>
         )}
+        <div className={styles.viewToggle}>
+          <button
+            className={`${styles.viewToggleBtn} ${viewMode === 'list' ? styles.viewToggleActive : ''}`}
+            onClick={() => setViewMode('list')}
+            aria-label="Vista lista"
+          >
+            <LayoutList size={15} />
+          </button>
+          <button
+            className={`${styles.viewToggleBtn} ${viewMode === 'map' ? styles.viewToggleActive : ''}`}
+            onClick={() => setViewMode('map')}
+            aria-label="Mapa de repisas"
+          >
+            <Map size={15} />
+          </button>
+        </div>
         <button className={`${styles.toolbarBtn} ${styles.addBtn}`} onClick={() => setFormTarget('new')}>
           <Plus size={15} />
           <span>Agregar</span>
@@ -151,8 +181,10 @@ export default function InventoryView({ initialItems, sheetId }: InventoryViewPr
         )}
       </div>
 
-      {/* List / Empty state */}
-      {products.length === 0 && !isControlled ? (
+      {/* List / Map / Empty state */}
+      {viewMode === 'map' ? (
+        <ShelfMapView items={products} searchQuery={search} />
+      ) : products.length === 0 && !isControlled ? (
         <div className={styles.emptyState}>
           <p className={styles.emptyTitle}>No hay productos</p>
           <p className={styles.emptySubtitle}>Añade un producto manualmente.</p>

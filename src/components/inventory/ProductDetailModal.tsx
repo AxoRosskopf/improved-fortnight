@@ -1,8 +1,10 @@
 'use client';
 
+import { useState } from 'react';
 import { X } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import type { InventoryItem, StockStatus } from '@/lib/types';
+import { driveProxyUrl } from '@/lib/url-utils';
 import styles from './ProductDetailModal.module.css';
 
 function deriveStatus(item: InventoryItem): StockStatus {
@@ -28,6 +30,32 @@ interface FieldRowProps {
   label: string;
   value?: string | number | null;
   isLink?: boolean;
+}
+
+function ImageRow({ label, url }: { label: string; url?: string | null }) {
+  const [broken, setBroken] = useState(false);
+  if (!url) return null;
+  return (
+    <div className={styles.field}>
+      <span className={styles.fieldLabel}>{label}</span>
+      <div className={styles.imageBlock}>
+        {!broken && (
+          <img
+            src={driveProxyUrl(url)}
+            alt="Foto del producto"
+            className={styles.productImage}
+            onError={() => setBroken(true)}
+          />
+        )}
+        {broken && (
+          <span className={styles.imageFallback}>No se pudo cargar la imagen</span>
+        )}
+        <a className={styles.fieldLink} href={url} target="_blank" rel="noopener noreferrer">
+          Ver en Drive
+        </a>
+      </div>
+    </div>
+  );
 }
 
 function FieldRow({ label, value, isLink }: FieldRowProps) {
@@ -80,7 +108,7 @@ export default function ProductDetailModal({ product, onEdit, onDelete, onClose 
           <FieldRow label="Precio de compra" value={`$${product.purchasePrice?.toFixed(2)}`} />
           <FieldRow label="Precio de venta" value={`$${product.salePrice?.toFixed(2)}`} />
           <FieldRow label="Notas" value={product.notes ?? ''} />
-          <FieldRow label="Foto" value={product.imageUrl ?? ''} isLink />
+          <ImageRow label="Foto" url={product.imageUrl} />
           <FieldRow label="Ficha técnica" value={product.techSheetUrl ?? ''} isLink />
           <FieldRow label="Link de video" value={product.videoUrl ?? ''} isLink />
           <FieldRow label="Código QR" value={product.qrCode} />

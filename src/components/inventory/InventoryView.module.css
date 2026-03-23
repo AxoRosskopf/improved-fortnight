@@ -37,6 +37,39 @@
   color: #fff;
 }
 
+.viewToggle {
+  display: flex;
+  border-radius: var(--radius-md);
+  background: var(--bg-card);
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+}
+
+.viewToggleBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 7px 10px;
+  color: var(--text-muted);
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+.viewToggleBtn:hover {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+.viewToggleActive {
+  background: var(--accent);
+  color: #fff;
+}
+
+.viewToggleActive:hover {
+  background: var(--accent);
+  color: #fff;
+  opacity: 0.88;
+}
+
 .addBtn:hover {
   opacity: 0.88;
   background: var(--accent);

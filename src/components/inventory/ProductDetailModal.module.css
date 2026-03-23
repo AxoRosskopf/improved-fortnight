@@ -162,3 +162,26 @@
 .editBtn:hover {
   opacity: 0.88;
 }
+
+.imageBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.productImage {
+  width: 100%;
+  max-width: 440px;
+  max-height: 280px;
+  object-fit: contain;
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+  display: block;
+}
+
+.imageFallback {
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  font-style: italic;
+}

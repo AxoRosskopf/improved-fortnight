@@ -34,6 +34,10 @@ export interface InventoryItem {
   videoUrl?: string;
   notes?: string;
 
+  /** Shelf map location — stored as columns "Estante" / "Nivel" in Google Sheets. */
+  shelf?: number;  // 1–3
+  level?: number;  // 1–4
+
   /** Present only when the item was fetched from Google Sheets. */
   _sheetMeta?: SheetMeta;
 }

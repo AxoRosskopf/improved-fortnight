@@ -1,5 +1,5 @@
-import Image from 'next/image';
 import type { InventoryItem, StockStatus } from '@/lib/types';
+import { driveProxyUrl } from '@/lib/url-utils';
 import styles from './InventoryCard.module.css';
 
 function deriveStatus(product: InventoryItem): StockStatus {
@@ -26,13 +26,13 @@ export default function InventoryCard({ item, onClick }: { item: InventoryItem; 
       tabIndex={onClick ? 0 : undefined}
       onKeyDown={onClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') onClick(); } : undefined}
     >
-      <Image
-        src={item.imageUrl || '/images/product-placeholder.svg'}
+      <img
+        src={item.imageUrl ? driveProxyUrl(item.imageUrl) : '/images/product-placeholder.svg'}
         alt={item.name}
         width={64}
         height={64}
         className={styles.image}
-        unoptimized={!!item.imageUrl}
+        onError={(e) => { e.currentTarget.src = '/images/product-placeholder.svg'; }}
       />
 
       <div className={styles.info}>
@@ -42,6 +42,11 @@ export default function InventoryCard({ item, onClick }: { item: InventoryItem; 
           {item.stock} {item.unit} in Stock
         </p>
         <p className={styles.barcode}>{item.description}</p>
+        <p className={styles.location}>
+          {item.shelf && item.level
+            ? `E${item.shelf} · N${item.level}`
+            : 'Sin asignar'}
+        </p>
       </div>
 
       <div className={styles.right}>
