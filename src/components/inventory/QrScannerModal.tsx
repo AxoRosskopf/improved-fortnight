@@ -46,7 +46,7 @@ export default function QrScannerModal({ products, onFound, onNotFound, onClose 
               }
             });
           },
-          () => {}, // partial detection — ignore
+          () => {}, 
         );
       } catch (err) {
         setError('No se pudo acceder a la cámara.');

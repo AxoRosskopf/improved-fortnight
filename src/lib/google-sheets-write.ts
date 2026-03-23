@@ -9,13 +9,19 @@
 
 import { google } from 'googleapis';
 import type { InventoryItem } from '@/lib/types';
+import type { LogEntry } from '@/lib/types';
 import type { CsvFormat } from '@/lib/csv-parser';
 
 // ---------------------------------------------------------------------------
 // Auth
 // ---------------------------------------------------------------------------
 
+// Module-level singleton: reused across calls within the same warm instance.
+let _authClient: InstanceType<typeof google.auth.JWT> | null = null;
+
 function getAuthClient() {
+  if (_authClient) return _authClient;
+
   const raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
   if (!raw) {
     throw new Error(
@@ -26,11 +32,12 @@ function getAuthClient() {
   }
 
   const key = JSON.parse(raw);
-  return new google.auth.JWT({
+  _authClient = new google.auth.JWT({
     email: key.client_email,
     key: key.private_key,
     scopes: ['https://www.googleapis.com/auth/spreadsheets'],
   });
+  return _authClient;
 }
 
 // ---------------------------------------------------------------------------
@@ -93,6 +100,66 @@ const LAST_COL: Record<CsvFormat, string> = {
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
+
+/**
+ * Ensures the "Logs" tab exists with the correct headers.
+ * Creates it if missing.
+ */
+async function ensureLogsSheet(
+  spreadsheetId: string,
+  sheets: ReturnType<typeof google.sheets>,
+): Promise<void> {
+  const meta = await sheets.spreadsheets.get({ spreadsheetId });
+  const exists = meta.data.sheets?.some((s) => s.properties?.title === 'Logs');
+  if (!exists) {
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId,
+      requestBody: { requests: [{ addSheet: { properties: { title: 'Logs' } } }] },
+    });
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: `'Logs'!A1:E1`,
+      valueInputOption: 'USER_ENTERED',
+      requestBody: { values: [['Fecha y hora', 'Usuario', 'Acción', 'Producto', 'Hoja']] },
+    });
+  }
+}
+
+/**
+ * Appends a log entry to the "Logs" tab.
+ * Columns: A=Fecha y hora | B=Usuario | C=Acción | D=Producto | E=Hoja
+ * Auto-creates the tab with headers if it doesn't exist yet.
+ */
+export async function appendLog(spreadsheetId: string, entry: LogEntry): Promise<void> {
+  const auth = getAuthClient();
+  const sheets = google.sheets({ version: 'v4', auth });
+  const row = [[entry.timestamp, entry.userName, entry.action, entry.itemName, entry.sheetName]];
+  try {
+    await sheets.spreadsheets.values.append({
+      spreadsheetId,
+      range: `'Logs'!A:E`,
+      valueInputOption: 'USER_ENTERED',
+      insertDataOption: 'INSERT_ROWS',
+      requestBody: { values: row },
+    });
+  } catch {
+    // Tab probably doesn't exist — try to create it, then always retry the append.
+    // ensureLogsSheet is in its own try so that if a concurrent request already created
+    // the tab (causing batchUpdate to throw), we still proceed to the retry append.
+    try { await ensureLogsSheet(spreadsheetId, sheets); } catch { /* already exists or other transient error */ }
+    try {
+      await sheets.spreadsheets.values.append({
+        spreadsheetId,
+        range: `'Logs'!A:E`,
+        valueInputOption: 'USER_ENTERED',
+        insertDataOption: 'INSERT_ROWS',
+        requestBody: { values: row },
+      });
+    } catch {
+      // Don't break the main operation if logging fails
+    }
+  }
+}
 
 /**
  * Appends a new item as the last row of the given sheet tab.

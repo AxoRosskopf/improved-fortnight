@@ -1,5 +1,13 @@
 export type StockStatus = 'in-stock' | 'low-stock' | 'out-of-stock';
 
+export interface LogEntry {
+  timestamp: string;          // ISO string
+  userName: string;
+  action: 'Creó' | 'Editó' | 'Eliminó';
+  itemName: string;
+  sheetName: string;
+}
+
 /** Internal metadata attached when an item is loaded from Google Sheets.
  *  Never displayed in the UI or exported to CSV. */
 export interface SheetMeta {

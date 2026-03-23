@@ -1,12 +1,14 @@
 'use client';
 
-import { useState, useRef } from 'react';
-import { Upload, Download, Plus, ScanLine } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Plus, ScanLine, ClipboardList } from 'lucide-react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useInventory } from '@/hooks/useInventory';
 import { useToast } from '@/hooks/useToast';
 import { useInventoryFilter } from '@/hooks/useInventoryFilter';
-import { exportToCsv } from '@/lib/csv-parser';
-import { useCsvImport } from '@/hooks/useCsvImport';
+import { useSheetsSync } from '@/hooks/useSheetsSync';
+import { useCurrentUser } from '@/hooks/useCurrentUser';
 import type { InventoryItem } from '@/lib/types';
 import SearchBar from './SearchBar';
 import FilterSortSheet from './FilterSortSheet';
@@ -14,7 +16,6 @@ import InventoryList from './InventoryList';
 import ProductFormModal from './ProductFormModal';
 import ProductDetailModal from './ProductDetailModal';
 import QrScannerModal from './QrScannerModal';
-import CsvPreviewModal from './CsvPreviewModal';
 import ScanFab from '@/components/ui/ScanFab';
 import styles from './InventoryView.module.css';
 
@@ -33,12 +34,27 @@ export default function InventoryView({ initialItems, sheetId }: InventoryViewPr
   // Always call hooks unconditionally (React rules).
   const localInventory = useInventory();
   const { toast } = useToast();
-  const csvImport = useCsvImport();
+  const { userName, isLoaded } = useCurrentUser();
+  const router = useRouter();
+
+  // Gate: redirect to /register if not registered (controlled mode only)
+  useEffect(() => {
+    if (isControlled && sheetId && isLoaded && !userName) {
+      router.push(`/register?from=/dashboard/${sheetId}`);
+    }
+  }, [isLoaded, userName, isControlled, sheetId, router]);
 
   // Controlled mode keeps a local copy; uncontrolled delegates to the hook.
   const [localItems, setLocalItems] = useState<InventoryItem[]>(initialItems ?? []);
-  const [isSaving, setIsSaving] = useState(false);
+
+  // Sync from server whenever initialItems changes (after router.refresh()).
+  useEffect(() => {
+    if (initialItems !== undefined) setLocalItems(initialItems);
+  }, [initialItems]);
   const products = isControlled ? localItems : localInventory.products;
+
+  const sheetsSync = useSheetsSync(sheetId ?? '', setLocalItems);
+  const isSaving = sheetsSync.isSaving;
 
   const { search, setSearch, selectedCategories, toggleCategory, stockSort, toggleStockSort, filterActive, categories, filtered } =
     useInventoryFilter(products);
@@ -48,39 +64,8 @@ export default function InventoryView({ initialItems, sheetId }: InventoryViewPr
   const [detailTarget, setDetailTarget] = useState<InventoryItem | null>(null);
   const [scannerOpen, setScannerOpen] = useState(false);
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    csvImport.parse(file);
-    if (fileInputRef.current) fileInputRef.current.value = '';
-  }
-
-  function handleCsvConfirm() {
-    const items = csvImport.confirm();
-    if (isControlled) {
-      setLocalItems(items);
-    } else {
-      localInventory.replaceAll(items);
-      toast(`${items.length} productos importados`, 'success');
-    }
-  }
-
-  function handleCsvExport() {
-    const csv = exportToCsv(products);
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'inventario.csv';
-    a.click();
-    URL.revokeObjectURL(url);
-  }
-
   async function handleSave(item: InventoryItem) {
     if (!isControlled) {
-      // Uncontrolled: persist to localStorage only
       if (formTarget === 'new') {
         localInventory.addProduct(item);
       } else if (formTarget) {
@@ -103,95 +88,26 @@ export default function InventoryView({ initialItems, sheetId }: InventoryViewPr
       return;
     }
 
-    // Controlled + sheetId: sync to Google Sheets
-    setIsSaving(true);
-    try {
-      if (formTarget === 'new') {
-        // Find a sibling item with the same category to determine which sheet tab to use
-        const sibling = localItems.find(
-          (i) => i.category === item.category && i._sheetMeta,
-        );
-        if (!sibling?._sheetMeta) {
-          toast(`No se encontró un producto con categoría "${item.category}" para determinar la hoja. Elige una categoría existente.`, 'error');
-          return;
-        }
-        const { sheetName, format } = sibling._sheetMeta;
-
-        const res = await fetch('/api/items', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ spreadsheetId: sheetId, sheetName, item, format }),
-        });
-        if (!res.ok) {
-          const data = await res.json().catch(() => ({}));
-          throw new Error(data.error ?? `Error ${res.status}`);
-        }
-        const { rowIndex } = await res.json();
-        setLocalItems((prev) => [
-          ...prev,
-          { ...item, _sheetMeta: { sheetName, rowIndex, format } },
-        ]);
-      } else {
-        // Editing: item._sheetMeta was preserved by ProductFormModal
-        const meta = item._sheetMeta;
-        if (!meta) {
-          toast('Este producto no tiene datos de hoja. No se puede actualizar.', 'error');
-          return;
-        }
-        const res = await fetch('/api/items', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            spreadsheetId: sheetId,
-            sheetName: meta.sheetName,
-            rowIndex: meta.rowIndex,
-            item,
-            format: meta.format,
-          }),
-        });
-        if (!res.ok) {
-          const data = await res.json().catch(() => ({}));
-          throw new Error(data.error ?? `Error ${res.status}`);
-        }
-        setLocalItems((prev) => prev.map((i) => (i.id === item.id ? item : i)));
-        if (detailTarget?.id === item.id) setDetailTarget(item);
-      }
+    const isNew = formTarget === 'new';
+    const success = await sheetsSync.save(item, isNew, localItems);
+    if (success) {
+      if (!isNew && detailTarget?.id === item.id) setDetailTarget(item);
       setFormTarget(null);
-    } catch (err) {
-      toast((err as Error).message, 'error');
-    } finally {
-      setIsSaving(false);
+      router.refresh();
     }
   }
 
   async function handleDelete(item: InventoryItem) {
     if (!isControlled || !sheetId || !item._sheetMeta) {
-      // Uncontrolled or no sheet connection: delete from local state only
       if (!isControlled) localInventory.deleteProduct(item.id);
       else setLocalItems((prev) => prev.filter((i) => i.id !== item.id));
       setDetailTarget(null);
       return;
     }
 
-    setIsSaving(true);
-    try {
-      const { sheetName, rowIndex } = item._sheetMeta;
-      const res = await fetch('/api/items', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ spreadsheetId: sheetId, sheetName, rowIndex }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error ?? `Error ${res.status}`);
-      }
-      setLocalItems((prev) => prev.filter((i) => i.id !== item.id));
-      setDetailTarget(null);
-    } catch (err) {
-      toast((err as Error).message, 'error');
-    } finally {
-      setIsSaving(false);
-    }
+    await sheetsSync.remove(item);
+    setDetailTarget(null);
+    router.refresh();
   }
 
   return (
@@ -202,15 +118,12 @@ export default function InventoryView({ initialItems, sheetId }: InventoryViewPr
           <ScanLine size={15} />
           <span>Escanear</span>
         </button>
-        <label className={styles.toolbarBtn}>
-          <Upload size={15} />
-          <span>Importar</span>
-          <input ref={fileInputRef} type="file" accept=".csv" hidden onChange={handleFileSelect} />
-        </label>
-        <button className={styles.toolbarBtn} onClick={handleCsvExport}>
-          <Download size={15} />
-          <span>Exportar</span>
-        </button>
+        {isControlled && sheetId && (
+          <Link href={`/dashboard/${sheetId}/logs`} className={styles.toolbarBtn}>
+            <ClipboardList size={15} />
+            <span>Actividad</span>
+          </Link>
+        )}
         <button className={`${styles.toolbarBtn} ${styles.addBtn}`} onClick={() => setFormTarget('new')}>
           <Plus size={15} />
           <span>Agregar</span>
@@ -226,7 +139,6 @@ export default function InventoryView({ initialItems, sheetId }: InventoryViewPr
           filterActive={filterActive}
         />
 
-        {/* Filter / sort sheet — rendered here so it positions relative to the search bar */}
         {isFilterOpen && (
           <FilterSortSheet
             categories={categories}
@@ -243,17 +155,12 @@ export default function InventoryView({ initialItems, sheetId }: InventoryViewPr
       {products.length === 0 && !isControlled ? (
         <div className={styles.emptyState}>
           <p className={styles.emptyTitle}>No hay productos</p>
-          <p className={styles.emptySubtitle}>Añade uno manualmente o importa un CSV.</p>
+          <p className={styles.emptySubtitle}>Añade un producto manualmente.</p>
           <div className={styles.emptyActions}>
             <button className={`${styles.toolbarBtn} ${styles.addBtn}`} onClick={() => setFormTarget('new')}>
               <Plus size={15} />
               <span>Agregar producto</span>
             </button>
-            <label className={styles.toolbarBtn}>
-              <Upload size={15} />
-              <span>Importar CSV</span>
-              <input ref={fileInputRef} type="file" accept=".csv" hidden onChange={handleFileSelect} />
-            </label>
           </div>
         </div>
       ) : filtered.length === 0 ? (
@@ -299,15 +206,6 @@ export default function InventoryView({ initialItems, sheetId }: InventoryViewPr
             toast(`Producto no encontrado: ${code}`, 'error');
           }}
           onClose={() => setScannerOpen(false)}
-        />
-      )}
-
-      {csvImport.preview !== null && (
-        <CsvPreviewModal
-          preview={csvImport.preview}
-          errors={csvImport.errors}
-          onConfirm={handleCsvConfirm}
-          onCancel={() => csvImport.reset()}
         />
       )}
 

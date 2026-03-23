@@ -9,22 +9,13 @@
  * server-side every 60 seconds.
  */
 
-import SheetRenderer from '@/components/inventory/SheetRenderer';
+import InventoryView from '@/components/inventory/InventoryView';
 import { fetchSheetData } from '@/lib/google-sheets';
 import type { Metadata } from 'next';
 
-// ---------------------------------------------------------------------------
-// Dynamic metadata
-// ---------------------------------------------------------------------------
-
-// In Next.js 15, `params` is a Promise — must be awaited before use.
 export async function generateMetadata(): Promise<Metadata> {
   return { title: `Inventario` };
 }
-
-// ---------------------------------------------------------------------------
-// Page component
-// ---------------------------------------------------------------------------
 
 export default async function Page({
   params,
@@ -34,7 +25,6 @@ export default async function Page({
   const { sheetId } = await params;
 
   const sheets = await fetchSheetData(sheetId);
-
   const nonEmpty = sheets.filter((s) => s.items.length > 0);
 
   if (nonEmpty.length === 0) {
@@ -46,5 +36,6 @@ export default async function Page({
     );
   }
 
-  return <SheetRenderer sheets={nonEmpty} sheetId={sheetId} />;
+  const allItems = nonEmpty.flatMap((s) => s.items);
+  return <InventoryView initialItems={allItems} sheetId={sheetId} />;
 }

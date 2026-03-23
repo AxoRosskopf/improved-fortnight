@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { appendRow, updateRow, deleteRow } from '@/lib/google-sheets-write';
+import { validateProduct } from '@/lib/validation';
 import type { InventoryItem } from '@/lib/types';
 import type { CsvFormat } from '@/lib/csv-parser';
 
@@ -22,7 +24,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Faltan campos requeridos: spreadsheetId, sheetName, item, format.' }, { status: 400 });
     }
 
+
+    if (format === 'unknown') {
+      return NextResponse.json({ error: 'Formato de hoja no reconocido.' }, { status: 400 });
+    }
+
+    const errors = validateProduct(item);
+    if (errors.length > 0) {
+      return NextResponse.json({ error: errors.map((e) => e.message).join(', ') }, { status: 422 });
+    }
+
     const rowIndex = await appendRow(spreadsheetId, sheetName, item, format);
+    revalidatePath(`/dashboard/${spreadsheetId}`);
     return NextResponse.json({ ok: true, rowIndex });
   } catch (err) {
     console.error('[POST /api/items]', err);
@@ -50,7 +63,18 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Faltan campos requeridos: spreadsheetId, sheetName, rowIndex, item, format.' }, { status: 400 });
     }
 
+
+    if (format === 'unknown') {
+      return NextResponse.json({ error: 'Formato de hoja no reconocido.' }, { status: 400 });
+    }
+
+    const errors = validateProduct(item);
+    if (errors.length > 0) {
+      return NextResponse.json({ error: errors.map((e) => e.message).join(', ') }, { status: 422 });
+    }
+
     await updateRow(spreadsheetId, sheetName, rowIndex, item, format);
+    revalidatePath(`/dashboard/${spreadsheetId}`);
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error('[PUT /api/items]', err);
@@ -76,7 +100,9 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Faltan campos requeridos: spreadsheetId, sheetName, rowIndex.' }, { status: 400 });
     }
 
+
     await deleteRow(spreadsheetId, sheetName, rowIndex);
+    revalidatePath(`/dashboard/${spreadsheetId}`);
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error('[DELETE /api/items]', err);
